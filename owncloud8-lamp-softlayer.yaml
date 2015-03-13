@@ -1,0 +1,132 @@
+- hosts: localhost
+  connection: local
+  remote_user: root
+  sudo: yes
+  gather_facts: no
+  vars:
+    mysql_db_password: ownclouddb
+    php_timezone: Asia/Tokyo
+    repository_files_softlayer: https://github.com/ukitiyan/files_softlayer.git
+  tasks:
+   - name: yum install git
+     yum: name=httpd state=present
+
+   - name: yum install wget
+     yum: name=httpd state=present
+
+   - name: yum install unzip
+     yum: name=httpd state=present
+
+   - name: yum install httpd
+     yum: name=httpd state=present
+
+   - name: yum install apache
+     yum: name=httpd state=latest
+
+   - name: yum install mod_ssl
+     yum: name=mod_ssl state=present
+
+   - name: yum install epel
+     yum: name=http://ftp.iij.ad.jp/pub/linux/fedora/epel/6/x86_64/epel-release-6-8.noarch.rpm
+
+   - name: yum install remi repository
+     yum: name=http://remi.kazukioishi.net/enterprise/remi-release-6.rpm
+
+   - name: yum remove mysql-*
+     yum: name=mysql-libs.x86_64 state=absent
+
+   - name: yum install php54
+     yum: name="{{item.name}}" state=present enablerepo=remi
+     with_items:
+       - {name: php}
+       - {name: php-cli}
+       - {name: php-common}
+       - {name: php-devel}
+       - {name: php-gd}
+       - {name: php-mbstring}
+       - {name: php-mcrypt}
+       - {name: php-pdo}
+       - {name: php-process}
+       - {name: php-xml}
+       - {name: php-pecl-zendopcache}
+       - {name: php-fpm }
+       - {name: php-ldap }
+       - {name: php-mysqlnd }
+
+   - name: yum install MySQL-python
+     yum: name="{{item.name}}" state=present
+     with_items:
+       - {name: MySQL-python}
+
+   - name: yum install php-pear-Net-Curl
+     yum: name="{{item.name}}" state=present enablerepo=epel
+     with_items:
+       - {name: php-pear-Net-Curl}
+
+    - name: yum install mysql
+      yum: name="{{item.name}}" enablerepo=remi,epel state=installed
+      with_items:
+        - {name: mysql}
+        - {name: mysql-server}
+        - {name: mysql-devel}
+    - service: name=mysqld state=started enabled=yes
+    - mysql_db: name=owncloud
+    - mysql_user: name=owncloud_dbadmin password={{ mysql_db_password }} priv=owncloud.*:ALL
+
+   - name: wget install owncloud repo file
+     get_url: url=http://download.opensuse.org/repositories/isv:ownCloud:community/CentOS_CentOS-6/isv:ownCloud:community.repo dest=/etc/yum.repos.d/
+
+   - name: install owncloud
+     yum: name="{{item.name}}" state=present enablerepo=isv_ownCloud_community
+     with_items:
+      - {name: owncloud}
+      - {name: owncloud-3rdparty}
+
+   - name: git clone files_softlayer
+     git: repo={{ repository_files_softlayer }}
+          dest=/var/www/html/owncloud/apps/files_softlayer version=master accept_hostkey=yes
+          sudo: apache
+
+   - name: change php timezone
+     replace: >-
+        dest=/etc/php.ini
+        regexp="^;date\.timezone ="
+        line="date.timezone = {{ php_timezone }}"
+
+   - name: change php expose_php
+     replace: >-
+        dest=/etc/php.ini
+        regexp="^expose_php = On"
+        line="expose_php = Off"
+
+   - name: change php default_charset
+     replace: >-
+        dest=/etc/php.ini
+        regexp=";default_charset ="
+        replace="default_charset ="
+
+   - name: change apache document root
+     replace: >-
+       dest='/etc/httpd/conf/httpd.conf'
+       regexp='^DocumentRoot .*'
+       replace='DocumentRoot "/var/www/html/owncloud/"'
+
+   - name: change apache document root path
+     replace: >-
+       dest='/etc/httpd/conf/httpd.conf'
+       regexp='^<Directory "/var/www/html">'
+       replace='<Directory "/var/www/html/owncloud">'
+
+   - name: add AllowOverride all
+     shell: >-
+       c='/etc/httpd/conf/httpd.conf' &&
+       k='<Directory "\/var\/www\/html\/owncloud">' &&
+       s='AllowOverride None' &&
+       r='AllowOverride All' &&
+       mv $c $c.backup &&
+       awk "/$k/{f=1} f==1&&/$s/{sub(/.+/,\"$r\"); f=0} 1" $c.backup > $c
+
+  handlers:
+    - name: restart httpd
+      service: name=httpd state=restarted
+
