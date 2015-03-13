@@ -4,6 +4,7 @@
   sudo: yes
   gather_facts: no
   vars:
+    mysql_db_user: owncloud_dbadmin
     mysql_db_password: ownclouddb
     php_timezone: Asia/Tokyo
     repository_files_softlayer: https://github.com/ukitiyan/files_softlayer.git
@@ -75,7 +76,7 @@
        - {name: mysql-devel}
    - service: name=mysqld state=started enabled=yes
    - mysql_db: name=owncloud
-   - mysql_user: name=owncloud_dbadmin password={{ mysql_db_password }} priv=owncloud.*:ALL
+   - mysql_user: name={{ mysql_db_user }} password={{ mysql_db_password }} priv=owncloud.*:ALL
 
    - name: wget install owncloud repo file
      get_url: url=http://download.opensuse.org/repositories/isv:ownCloud:community/CentOS_CentOS-6/isv:ownCloud:community.repo dest=/etc/yum.repos.d/
