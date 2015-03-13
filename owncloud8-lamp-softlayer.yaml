@@ -158,7 +158,7 @@
        regexp='^SSLProtocol .*'
        replace='SSLProtocol all -SSLv2 -SSLv3'
 
-   - name: change ssl SSLCertificateKeyFile
+   - name: change ssl SSLCertificateFile
      replace: >-
        dest='/etc/httpd/conf.d/ssl.conf'
        regexp='^SSLCertificateFile .*'
