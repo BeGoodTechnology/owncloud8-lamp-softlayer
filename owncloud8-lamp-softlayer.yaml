@@ -94,11 +94,7 @@
      file: dest=/home/data owner=apache group=apache state=directory
 
    - name: copy owncloud.conf"
-     template:
-       src: owncloud_config.php.j2
-       dest: "{{ path_document_root }}/config/owncloud.conf"
-       owner: apache
-       group: apache
+     template: src=./owncloud_config.php.j2 dest={{ path_document_root }}/config/config.php owner=apache group=apache
 
    - name: change php timezone
      replace: >-
