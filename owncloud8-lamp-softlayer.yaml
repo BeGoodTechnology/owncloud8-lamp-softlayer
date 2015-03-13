@@ -8,8 +8,10 @@
     php_timezone: Asia/Tokyo
     repository_files_softlayer: https://github.com/ukitiyan/files_softlayer.git
     path_document_root: /var/www/html/owncloud
-    inventory_hostname: centos65
   tasks:
+   - name: OS timezon to JST
+     shell: cp -p  /usr/share/zoneinfo/Japan /etc/localtime
+
    - name: yum install git
      yum: name=httpd state=present
 
@@ -91,8 +93,12 @@
    - name: make owncloud data dir
      file: dest=/home/data owner=apache group=apache state=directory
 
-   - name: "expand owncloud.conf"
-     template: src=owncloud_config.php.j2 dest={{ path_document_root }}/config/owncloud.conf owner=apache group=apache
+   - name: copy owncloud.conf"
+     template:
+       src: owncloud_config.php.j2
+       dest: "{{ path_document_root }}/config/owncloud.conf"
+       owner: apache
+       group: apache
 
    - name: change php timezone
      replace: >-
@@ -118,27 +124,12 @@
        regexp='^DocumentRoot .*'
        replace='DocumentRoot "{{ path_document_root }}/"'
 
-   - name: change apache document root path
-     replace: >-
-       dest='/etc/httpd/conf/httpd.conf'
-       regexp='^<Directory "/var/www/html">'
-       replace='<Directory "{{ path_document_root }}">'
-
-   - name: add AllowOverride all
-     shell: >-
-       c='/etc/httpd/conf/httpd.conf' &&
-       k='<Directory "\/var\/www\/html\/owncloud">' &&
-       s='AllowOverride None' &&
-       r='AllowOverride All' &&
-       mv $c $c.backup &&
-       awk "/$k/{f=1} f==1&&/$s/{sub(/.+/,\"$r\"); f=0} 1" $c.backup > $c
-
    - name: create self signed certificate
      shell: |
        crt_file="/etc/pki/tls/certs/{{ inventory_hostname }}.crt" &&
        key_file="/etc/pki/tls/private/{{ inventory_hostname }}.key" &&
        crt_and_key_file="/etc/pki/tls/private/{{ inventory_hostname }}.crt_and_key" &&
-       subject="/C=JP/ST=/L=/CN={{ inventory_hostname }}" &&
+       subject="/C=JP/CN={{ inventory_hostname }}" &&
        openssl req -new -newkey rsa:2048 -sha1 -x509 -nodes \
        -set_serial 1 \
        -days 365 \
@@ -152,13 +143,13 @@
    - name: change ssl document root
      replace: >-
        dest='/etc/httpd/conf.d/ssl.conf'
-       regexp='^DocumentRoot .*'
+       regexp='^#DocumentRoot .*'
        replace='DocumentRoot "{{ path_document_root }}/"'
 
    - name: change ssl servername
      replace: >-
        dest='/etc/httpd/conf.d/ssl.conf'
-       regexp='^ServerName .*'
+       regexp='^#ServerName .*'
        replace='ServerName "{{ inventory_hostname }}"'
 
    - name: change ssl SSLProtocol
@@ -167,20 +158,21 @@
        regexp='^SSLProtocol .*'
        replace='SSLProtocol all -SSLv2 -SSLv3'
 
-   - name: change ssl document root
+   - name: change ssl SSLCertificateKeyFile
      replace: >-
        dest='/etc/httpd/conf.d/ssl.conf'
        regexp='^SSLCertificateFile .*'
-       replace='SSLCertificateKeyFile /etc/pki/tls/certs/{{ inventory_hostname }}.crt'
+       replace='SSLCertificateFile /etc/pki/tls/certs/{{ inventory_hostname }}.crt'
 
-   - name: change ssl document root
+   - name: change ssl SSLCertificateKeyFile
      replace: >-
        dest='/etc/httpd/conf.d/ssl.conf'
        regexp='^SSLCertificateKeyFile .*'
        replace='SSLCertificateKeyFile /etc/pki/tls/private/{{ inventory_hostname }}.key'
 
-   - service: name=httpd state=restarted
+   - name: restart httpd
+     service: name=httpd state=restarted
 
-   handlers:
-     - name: restart httpd
-       service: name=httpd state=restarted
+  handlers:
+   - name: restart httpd
+     service: name=httpd state=restarted
